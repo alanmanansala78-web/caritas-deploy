@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Caritas AI — BSP Intake</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root{
+  --bg:#0d1117;--surf:#161b22;--brd:#21262d;
+  --acc:#2f6fd4;--acc2:#4d8ef0;
+  --mut:#8b949e;--txt:#e6edf3;--txt2:#c9d1d9;
+  --grn:#3fb950;--yel:#d29922;--red:#f85149;
+  --r:8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;min-height:100vh;}
+.hdr{background:var(--surf);border-bottom:1px solid var(--brd);padding:14px 28px;display:flex;align-items:center;gap:14px;}
+.hdr-brand{font-size:16px;font-weight:600;}
+.hdr-sub{font-size:11px;color:var(--mut);margin-top:1px;}
+.hdr-back{margin-left:auto;padding:6px 14px;border-radius:5px;font-size:12px;cursor:pointer;border:1px solid var(--brd);background:none;color:var(--txt2);text-decoration:none;display:inline-block;}
+.wrap{max-width:860px;margin:0 auto;padding:32px 24px;}
+
+/* ── Drop zone ── */
+.drop-zone{
+  border:2px dashed var(--brd);border-radius:12px;
+  padding:56px 32px;text-align:center;cursor:pointer;
+  transition:border-color .15s,background .15s;
+  position:relative;
+}
+.drop-zone.over{border-color:var(--acc);background:rgba(47,111,212,.06);}
+.drop-zone.done{border-style:solid;border-color:var(--grn);background:rgba(63,185,80,.04);cursor:default;}
+.drop-zone.error-state{border-style:solid;border-color:var(--red);background:rgba(248,81,73,.04);}
+.dz-icon{width:48px;height:48px;margin:0 auto 14px;stroke:var(--mut);fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;}
+.drop-zone.done .dz-icon{stroke:var(--grn);}
+.drop-zone.error-state .dz-icon{stroke:var(--red);}
+.dz-title{font-size:16px;font-weight:500;color:var(--txt2);margin-bottom:6px;}
+.dz-sub{font-size:12px;color:var(--mut);}
+.dz-hint{margin-top:10px;font-size:11px;color:var(--mut);}
+input[type=file]{display:none;}
+
+/* ── Live progress ── */
+.progress-wrap{margin-top:24px;display:none;}
+.progress-wrap.show{display:block;}
+.progress-track{height:4px;background:var(--brd);border-radius:2px;overflow:hidden;margin-bottom:20px;}
+.progress-fill{height:100%;background:var(--acc);border-radius:2px;transition:width .4s ease;width:0;}
+.steps{display:flex;flex-direction:column;gap:0;}
+.step{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.step:last-child{border-bottom:none;}
+.step-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;margin-top:1px;transition:background .2s;}
+.si-wait{background:var(--brd);color:var(--mut);}
+.si-run{background:var(--acc);color:#fff;animation:pulse 1.2s ease-in-out infinite;}
+.si-done{background:var(--grn);color:#fff;}
+.si-err{background:var(--red);color:#fff;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+.step-body{flex:1;}
+.step-label{font-size:13px;font-weight:500;color:var(--txt2);}
+.step-detail{font-size:11px;color:var(--mut);margin-top:2px;min-height:16px;}
+.step-detail.ok{color:var(--grn);}
+.step-detail.warn{color:var(--yel);}
+.step-detail.err{color:var(--red);}
+
+/* ── Result card ── */
+.result{background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);margin-top:24px;overflow:hidden;display:none;}
+.result.show{display:block;}
+.result-header{padding:16px 20px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:12px;}
+.rh-score{text-align:center;flex-shrink:0;}
+.rh-score-num{font-size:32px;font-weight:700;color:var(--txt);line-height:1;}
+.rh-score-denom{font-size:10px;color:var(--mut);}
+.rh-info{flex:1;}
+.rh-filename{font-size:13px;font-weight:500;color:var(--txt);margin-bottom:4px;}
+.rh-meta{font-size:11px;color:var(--mut);}
+.rh-badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:600;}
+.badge-profile{background:rgba(210,153,34,.14);color:var(--yel);border:1px solid rgba(210,153,34,.3);}
+.badge-pass{background:rgba(63,185,80,.14);color:var(--grn);border:1px solid rgba(63,185,80,.3);}
+.badge-hold{background:rgba(210,153,34,.14);color:var(--yel);border:1px solid rgba(210,153,34,.3);}
+.badge-fail{background:rgba(248,81,73,.14);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+.result-body{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.rb-col{padding:16px 20px;}
+.rb-col:first-child{border-right:1px solid var(--brd);}
+.col-title{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:10px;}
+.dom-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.dom-lbl{font-size:10px;color:var(--mut);width:120px;flex-shrink:0;text-align:right;}
+.dom-bar-bg{flex:1;height:6px;background:var(--brd);border-radius:3px;overflow:hidden;}
+.dom-bar-fill{height:100%;border-radius:3px;transition:width .5s ease;}
+.dom-val{font-size:10px;color:var(--txt2);width:24px;text-align:right;}
+.flag-item{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;border-radius:5px;margin-bottom:5px;}
+.fi-crit{background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.2);}
+.fi-warn{background:rgba(210,153,34,.07);border:1px solid rgba(210,153,34,.2);}
+.fi-info{background:rgba(77,142,240,.07);border:1px solid rgba(77,142,240,.2);}
+.fi-dot{width:5px;height:5px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+.fi-crit .fi-dot{background:var(--red);}
+.fi-warn .fi-dot{background:var(--yel);}
+.fi-info .fi-dot{background:var(--acc2);}
+.fi-type{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.fi-crit .fi-type{color:var(--red);}
+.fi-warn .fi-type{color:var(--yel);}
+.fi-info .fi-type{color:var(--acc2);}
+.fi-detail{font-size:11px;color:var(--c9d1d9,#c9d1d9);line-height:1.5;color:var(--txt2);}
+.result-actions{padding:14px 20px;border-top:1px solid var(--brd);display:flex;gap:10px;flex-wrap:wrap;}
+.btn{padding:8px 18px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;}
+.btn-primary{background:var(--acc);color:#fff;}
+.btn-primary:hover{background:var(--acc2);}
+.btn-secondary{background:none;border:1px solid var(--brd);color:var(--txt2);}
+.btn-secondary:hover{background:rgba(255,255,255,.05);}
+.btn-reset{margin-left:auto;background:none;border:1px solid rgba(248,81,73,.3);color:var(--red);}
+
+/* ── Case registry ── */
+.registry{margin-top:28px;}
+.reg-title{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:12px;}
+.case-table{width:100%;border-collapse:collapse;font-size:12px;}
+.case-table th{text-align:left;padding:7px 10px;background:var(--surf);color:var(--mut);font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--brd);}
+.case-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--txt2);vertical-align:middle;}
+.case-table tr:hover td{background:rgba(255,255,255,.02);}
+.ct-ref{color:var(--acc2);font-weight:600;}
+.ct-file{color:var(--txt2);}
+.ct-badge{display:inline-block;font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:3px;}
+.cb-pending{background:rgba(139,148,158,.1);color:var(--mut);}
+.cb-complete{background:rgba(63,185,80,.1);color:var(--grn);}
+.cb-running{background:rgba(210,153,34,.1);color:var(--yel);}
+.cb-failed{background:rgba(248,81,73,.1);color:var(--red);}
+.empty{text-align:center;padding:28px;color:var(--mut);font-size:12px;}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#1c2128;border:1px solid var(--brd);border-radius:6px;padding:10px 16px;font-size:12px;color:var(--txt);transform:translateY(80px);transition:transform .2s;z-index:999;max-width:340px;pointer-events:none;}
+.toast.show{transform:translateY(0);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="hdr-brand">Caritas AI — BSP Intake</div>
+    <div class="hdr-sub">Drop a BSP — de-identification, evaluation, and case registration run automatically</div>
+  </div>
+  <a href="platform.html" class="hdr-back">← Platform</a>
+</div>
+
+<div class="wrap">
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fi').click()">
+    <svg class="dz-icon" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="12" y1="13" x2="12" y2="19"/>
+      <polyline points="9 16 12 19 15 16"/>
+    </svg>
+    <div class="dz-title" id="dzTitle">Drop a BSP here to begin</div>
+    <div class="dz-sub" id="dzSub">PDF or DOCX · up to 20 MB · everything runs automatically</div>
+    <div class="dz-hint">De-identify → evaluate → register — no buttons to click</div>
+    <input type="file" id="fi" accept=".pdf,.docx">
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="steps">
+      <div class="step" id="s1">
+        <div class="step-icon si-wait" id="si1">1</div>
+        <div class="step-body"><div class="step-label">Extract text</div><div class="step-detail" id="sd1">Waiting</div></div>
+      </div>
+      <div class="step" id="s2">
+        <div class="step-icon si-wait" id="si2">2</div>
+        <div class="step-body"><div class="step-label">De-identify (Haiku v2.0)</div><div class="step-detail" id="sd2">Waiting</div></div>
+      </div>
+      <div class="step" id="s3">
+        <div class="step-icon si-wait" id="si3">3</div>
+        <div class="step-body"><div class="step-label">Evaluate quality (bsp-evaluator)</div><div class="step-detail" id="sd3">Waiting</div></div>
+      </div>
+      <div class="step" id="s4">
+        <div class="step-icon si-wait" id="si4">4</div>
+        <div class="step-body"><div class="step-label">Register in Supabase + upload to storage</div><div class="step-detail" id="sd4">Waiting</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result card -->
+  <div class="result" id="resultCard">
+    <div class="result-header">
+      <div class="rh-score">
+        <div class="rh-score-num" id="rScoreNum">—</div>
+        <div class="rh-score-denom">/100</div>
+      </div>
+      <div class="rh-info">
+        <div class="rh-filename" id="rFilename"></div>
+        <div class="rh-meta" id="rMeta"></div>
+        <div class="rh-badges" id="rBadges"></div>
+      </div>
+    </div>
+    <div class="result-body">
+      <div class="rb-col">
+        <div class="col-title">Domain scores</div>
+        <div id="rDomains"></div>
+      </div>
+      <div class="rb-col">
+        <div class="col-title">Flags</div>
+        <div id="rFlags"></div>
+      </div>
+    </div>
+    <div class="result-actions">
+      <button class="btn btn-primary" onclick="openQC()">Open in Quality Check →</button>
+      <button class="btn btn-secondary" onclick="copyReviewLink()">Copy Guided Review link</button>
+      <button class="btn btn-secondary" onclick="copyCaseRef()">Copy case ref</button>
+      <button class="btn btn-reset btn-secondary" onclick="resetAll()">Process another BSP</button>
+    </div>
+  </div>
+
+  <!-- Case registry -->
+  <div class="registry">
+    <div class="reg-title">Registered cases</div>
+    <div id="caseRegistry"><div class="empty">Loading…</div></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const SB_URL = "https://jbgzlxtqnrctpsnvjort.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZ3pseHRxbnJjdHBzbnZqb3J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTA5NzUsImV4cCI6MjA4ODkyNjk3NX0.YmayaIMNiUDP5jci3sxd2nkg_2-7IRYS5ORwlOuEgIE";
+
+const DOMAIN_KEYS   = ["d1_rp_identification","d2_fba_quality","d3_pbs_strategies","d4_crisis_response","d5_stakeholder_engagement","d6_governance","d7_implementation"];
+const DOMAIN_LABELS = ["RP Identification","FBA Quality","PBS Strategies","Crisis Response","Stakeholder","Governance","Implementation"];
+
+let state = { file: null, caseRef: null, deidText: null, evalData: null };
+
+// ── Drop handling ─────────────────────────────────────────────────────────
+const dz = document.getElementById("dropZone");
+document.getElementById("fi").addEventListener("change", e => { if(e.target.files[0]) start(e.target.files[0]); });
+dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("over"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("over"); if(e.dataTransfer.files[0]) start(e.dataTransfer.files[0]); });
+
+// ── Main pipeline ─────────────────────────────────────────────────────────
+async function start(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (ext === "doc")  { toast("Old .doc not supported — use PDF or convert to .docx"); return; }
+  if (!["pdf","docx"].includes(ext)) { toast("Only PDF and DOCX supported"); return; }
+  if (file.size > 20 * 1024 * 1024) { toast("File exceeds 20 MB"); return; }
+
+  state.file = file;
+  state.caseRef = genRef(file.name);
+
+  // UI: show progress, update drop zone
+  dz.classList.add("done");
+  dz.onclick = null;
+  document.getElementById("dzTitle").textContent = file.name;
+  document.getElementById("dzSub").textContent   = kb(file.size) + " · " + ext.toUpperCase() + " · Case: " + state.caseRef;
+  document.getElementById("progressWrap").classList.add("show");
+  setProgress(5);
+
+  try {
+    // ── 1. Extract ────────────────────────────────────────────────────────
+    si(1,"run"); sd(1,"Extracting text from " + file.name + "…");
+    const raw = await extractText(file);
+    if (!raw.trim()) throw new Error("Text extraction empty — PDF may be scanned or image-only");
+    const chars = raw.length;
+    const text  = raw.slice(0, 50000);
+    if (chars > 50000) toast("Text truncated at 50 000 chars (" + chars.toLocaleString() + " extracted)");
+    si(1,"done"); sd(1, chars.toLocaleString() + " chars · " + (chars > 50000 ? "truncated to 50 k" : "full document"), "ok");
+    setProgress(25);
+
+    // ── 2. De-identify ────────────────────────────────────────────────────
+    si(2,"run"); sd(2,"Calling standalone-deidentify…");
+    const deid = await callDeid(text);
+    state.deidText = deid.sanitised_text || deid.redacted_text || text;
+    const autoMasked = deid.auto_masked || 0;
+    const flagged    = (deid.flagged_items || []).length;
+    si(2,"done");
+    sd(2, autoMasked + " auto-masked · " + flagged + " flagged for review" + (flagged > 0 ? " (open deidentify.html to resolve)" : ""), flagged > 0 ? "warn" : "ok");
+    setProgress(50);
+
+    // ── 3. Evaluate ───────────────────────────────────────────────────────
+    si(3,"run"); sd(3,"Calling bsp-evaluator…");
+    const evalData = await callEvaluator(state.deidText);
+    state.evalData = evalData;
+    const profile = evalData.primary_profile || "—";
+    const score   = evalData.quality_score   || 0;
+    const rec     = evalData.release_recommendation || evalData.recommendation || "—";
+    si(3,"done"); sd(3,"Profile " + profile + " · Score " + score + " · " + rec, "ok");
+    setProgress(75);
+
+    // ── 4. Register ───────────────────────────────────────────────────────
+    si(4,"run"); sd(4,"Writing to bsp_cases…");
+    await registerCase(file, chars, autoMasked, flagged, evalData);
+    si(4,"done"); sd(4,"Case " + state.caseRef + " registered", "ok");
+    setProgress(100);
+    dz.classList.add("done");
+
+    // ── Show result card ──────────────────────────────────────────────────
+    showResult(file, chars, autoMasked, flagged, evalData);
+    loadRegistry();
+    toast("Case " + state.caseRef + " complete");
+
+  } catch(err) {
+    console.error(err);
+    // Mark first non-done step as error
+    for (let i = 1; i <= 4; i++) {
+      if (!document.getElementById("si"+i).classList.contains("si-done")) {
+        si(i,"err"); sd(i, err.message, "err"); break;
+      }
+    }
+    dz.classList.remove("done"); dz.classList.add("error-state");
+    toast("Error: " + err.message);
+  }
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────
+async function callDeid(text) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const r = await fetch(SB_URL + "/functions/v1/standalone-deidentify", {
+      method:"POST", signal:ctrl.signal,
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY,"apikey":SB_KEY},
+      body:JSON.stringify({text})
+    });
+    clearTimeout(t);
+    if (!r.ok) throw new Error("De-identify HTTP " + r.status);
+    const d = await r.json();
+    if (!d.sanitised_text && !d.redacted_text) throw new Error("De-identify returned no sanitised_text");
+    return d;
+  } catch(e) { clearTimeout(t); if(e.name==="AbortError") throw new Error("De-identify timed out"); throw e; }
+}
+
+async function callEvaluator(text) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 60000);
+  try {
+    const r = await fetch(SB_URL + "/functions/v1/bsp-evaluator", {
+      method:"POST", signal:ctrl.signal,
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY,"apikey":SB_KEY},
+      body:JSON.stringify({text})
+    });
+    clearTimeout(t);
+    if (!r.ok) throw new Error("Evaluator HTTP " + r.status);
+    return await r.json();
+  } catch(e) { clearTimeout(t); if(e.name==="AbortError") throw new Error("Evaluator timed out (60s)"); throw e; }
+}
+
+async function registerCase(file, chars, autoMasked, flagged, ev) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  const row = {
+    case_ref:         state.caseRef,
+    original_filename:file.name,
+    original_path:    "bsp-originals/" + state.caseRef + "/" + file.name,
+    char_count:       chars,
+    source_format:    ext,
+    deid_status:      "complete",
+    deid_text:        state.deidText,
+    deid_auto_masked: autoMasked,
+    deid_flagged:     flagged,
+    eval_status:      "complete",
+    ai_score:         ev.quality_score || null,
+    ai_profile:       ev.primary_profile || null,
+    ai_band:          ev.quality_level || ev.band || null,
+    ai_recommendation:ev.release_recommendation || ev.recommendation || null,
+    ai_domains:       buildDomains(ev),
+    ai_flags:         ev.flags || [],
+    ai_evaluated_at:  new Date().toISOString()
+  };
+  const r = await fetch(SB_URL + "/rest/v1/bsp_cases", {
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+SB_KEY,"apikey":SB_KEY,"Prefer":"return=minimal"},
+    body:JSON.stringify(row)
+  });
+  if (!r.ok) {
+    const e = await r.text();
+    if (e.includes("duplicate")||e.includes("unique")) throw new Error('Case ref "' + state.caseRef + '" already exists');
+    throw new Error("Supabase insert failed: " + e);
+  }
+  // Upload to storage (non-fatal)
+  try {
+    await fetch(SB_URL + "/storage/v1/object/bsp-originals/" + state.caseRef + "/" + file.name, {
+      method:"POST",
+      headers:{"Authorization":"Bearer "+SB_KEY,"apikey":SB_KEY,"Content-Type":file.type||"application/octet-stream"},
+      body:file
+    });
+  } catch(_) { /* storage optional */ }
+}
+
+function buildDomains(ev) {
+  const obj = {};
+  DOMAIN_KEYS.forEach(k => { obj[k] = ev[k] || 0; });
+  return obj;
+}
+
+// ── Result card ───────────────────────────────────────────────────────────
+function showResult(file, chars, autoMasked, flagged, ev) {
+  const score   = ev.quality_score || 0;
+  const profile = ev.primary_profile || "—";
+  const rec     = ev.release_recommendation || ev.recommendation || "—";
+  const band    = ev.quality_level || ev.band || "—";
+  const flags   = ev.flags || [];
+
+  document.getElementById("rScoreNum").textContent  = score;
+  document.getElementById("rFilename").textContent  = file.name;
+  document.getElementById("rMeta").textContent      = chars.toLocaleString() + " chars · " + autoMasked + " auto-masked · " + flagged + " flagged · Case: " + state.caseRef;
+
+  const recCls = rec==="PASS"?"badge-pass":rec==="FAIL"?"badge-fail":"badge-hold";
+  document.getElementById("rBadges").innerHTML =
+    '<span class="badge badge-profile">Profile ' + profile + '</span>' +
+    '<span class="badge ' + recCls + '">' + rec + '</span>' +
+    '<span class="badge badge-hold" style="background:rgba(139,148,158,.1);color:var(--mut);">Band: ' + band + '</span>';
+
+  // Domain bars
+  document.getElementById("rDomains").innerHTML = DOMAIN_KEYS.map((k,i) => {
+    const v = ev[k] || 0;
+    const c = v>=70?"var(--grn)":v>=45?"var(--yel)":"var(--red)";
+    return '<div class="dom-row"><div class="dom-lbl">' + DOMAIN_LABELS[i] + '</div>'
+      + '<div class="dom-bar-bg"><div class="dom-bar-fill" style="width:' + v + '%;background:' + c + ';"></div></div>'
+      + '<div class="dom-val">' + v + '</div></div>';
+  }).join("");
+
+  // Flags
+  document.getElementById("rFlags").innerHTML = flags.length ? flags.map(f => {
+    const sev = (f.severity||f.type||"info").toLowerCase();
+    const cls = sev==="critical"?"fi-crit":sev==="warning"||sev==="warn"?"fi-warn":"fi-info";
+    return '<div class="flag-item ' + cls + '">'
+      + '<div class="fi-dot"></div>'
+      + '<div><div class="fi-type">' + (f.type||sev) + '</div>'
+      + '<div class="fi-detail">' + (f.detail||f.message||"") + '</div></div></div>';
+  }).join("") : '<div style="font-size:12px;color:var(--mut);">No flags returned.</div>';
+
+  document.getElementById("resultCard").classList.add("show");
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
+function openQC() {
+  if (!state.caseRef) return;
+  sessionStorage.setItem("intake_case_ref",  state.caseRef);
+  sessionStorage.setItem("intake_deid_text", state.deidText || "");
+  window.location.href = "bsp-quality-check.html";
+}
+function copyReviewLink() {
+  const url = location.origin + "/guided-marking.html?case=" + state.caseRef;
+  navigator.clipboard.writeText(url).then(() => toast("Link copied"));
+}
+function copyCaseRef() {
+  navigator.clipboard.writeText(state.caseRef).then(() => toast("Case ref copied: " + state.caseRef));
+}
+function resetAll() {
+  state = { file:null, caseRef:null, deidText:null, evalData:null };
+  dz.className = "drop-zone"; dz.onclick = () => document.getElementById("fi").click();
+  document.getElementById("fi").value = "";
+  document.getElementById("dzTitle").textContent = "Drop a BSP here to begin";
+  document.getElementById("dzSub").textContent   = "PDF or DOCX · up to 20 MB · everything runs automatically";
+  document.getElementById("progressWrap").classList.remove("show");
+  document.getElementById("resultCard").classList.remove("show");
+  setProgress(0);
+  for (let i=1;i<=4;i++) { si(i,"wait"); sd(i, i===1?"Waiting for file":"Waiting"); }
+}
+
+// ── Case registry ─────────────────────────────────────────────────────────
+async function loadRegistry() {
+  const el = document.getElementById("caseRegistry");
+  try {
+    const r = await fetch(SB_URL + "/rest/v1/bsp_cases?select=case_ref,original_filename,source_format,ai_score,ai_profile,ai_recommendation,eval_status,created_at&order=created_at.desc&limit=30", {
+      headers:{"Authorization":"Bearer "+SB_KEY,"apikey":SB_KEY}
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const rows = await r.json();
+    if (!rows.length) { el.innerHTML = '<div class="empty">No cases yet — drop a BSP above to begin</div>'; return; }
+    el.innerHTML = '<table class="case-table">'
+      + '<thead><tr><th>Case ref</th><th>File</th><th>Format</th><th>Status</th><th>Profile</th><th>Score</th><th>Rec.</th><th>Created</th></tr></thead>'
+      + '<tbody>' + rows.map(r => {
+          const bc = r.eval_status==="complete"?"cb-complete":r.eval_status==="running"?"cb-running":r.eval_status==="failed"?"cb-failed":"cb-pending";
+          const dt = r.created_at ? new Date(r.created_at).toLocaleDateString("en-AU",{day:"2-digit",month:"short"}) : "—";
+          return '<tr>'
+            + '<td class="ct-ref">' + r.case_ref + '</td>'
+            + '<td class="ct-file" style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (r.original_filename||"—") + '</td>'
+            + '<td style="text-transform:uppercase;font-size:10px;color:var(--mut);">' + (r.source_format||"—") + '</td>'
+            + '<td><span class="ct-badge ' + bc + '">' + (r.eval_status||"pending") + '</span></td>'
+            + '<td style="font-weight:600;color:var(--yel);">' + (r.ai_profile||"—") + '</td>'
+            + '<td>' + (r.ai_score!=null?r.ai_score:"—") + '</td>'
+            + '<td style="font-size:11px;color:var(--mut);">' + (r.ai_recommendation||"—") + '</td>'
+            + '<td style="font-size:11px;color:var(--mut);">' + dt + '</td>'
+            + '</tr>';
+        }).join("") + '</tbody></table>';
+  } catch(e) {
+    el.innerHTML = '<div class="empty" style="color:var(--red);">Could not load cases: ' + e.message + '</div>';
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+function genRef(filename) {
+  const base = filename.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g,"-").slice(0,20);
+  const ts   = new Date().toISOString().slice(2,10).replace(/-/g,"");
+  return base + "-" + ts;
+}
+function kb(bytes) { return bytes < 1024*1024 ? Math.round(bytes/1024) + " KB" : (bytes/1024/1024).toFixed(1) + " MB"; }
+function setProgress(pct) { document.getElementById("progressFill").style.width = pct + "%"; }
+function si(n, state) {
+  const el = document.getElementById("si"+n);
+  el.className = "step-icon";
+  if (state==="run")  { el.classList.add("si-run");  el.textContent = n; }
+  else if (state==="done") { el.classList.add("si-done"); el.textContent = "✓"; }
+  else if (state==="err")  { el.classList.add("si-err");  el.textContent = "✗"; }
+  else { el.classList.add("si-wait"); el.textContent = n; }
+}
+function sd(n, msg, cls) {
+  const el = document.getElementById("sd"+n);
+  el.textContent = msg;
+  el.className = "step-detail" + (cls ? " " + cls : "");
+}
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+async function extractText(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (ext === "pdf") {
+    const ab  = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: ab}).promise;
+    let text  = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page    = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(" ") + "\n";
+      setProgress(5 + Math.round((i / pdf.numPages) * 18));
+    }
+    return text;
+  }
+  const ab = await file.arrayBuffer();
+  const r  = await mammoth.extractRawText({arrayBuffer: ab});
+  return r.value;
+}
+
+loadRegistry();
+</script>
+</body>
+</html>

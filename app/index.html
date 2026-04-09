@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Caritas AI Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#f7f5f0;min-height:100vh}
+.header{background:#1a1a2e;padding:0;display:flex;align-items:stretch;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.logo{padding:14px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo h1{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:#fff;letter-spacing:-0.5px}
+.logo .dot{width:8px;height:8px;background:#059669;border-radius:50%;animation:pulse 2s infinite}
+.logo .sub{font-size:10px;color:#64748b;display:block;margin-top:-2px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.tabs{display:flex;align-items:stretch;gap:0;margin-left:20px}
+.tab{padding:14px 24px;color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s;display:flex;align-items:center;gap:8px;white-space:nowrap;text-decoration:none}
+.tab:hover{color:#e2e8f0;background:rgba(255,255,255,0.05)}
+.tab.active{color:#fff;border-bottom-color:#2563eb;background:rgba(255,255,255,0.08)}
+.status{display:flex;align-items:center;margin-left:auto;padding:0 20px;gap:8px}
+.status .dot{width:6px;height:6px;border-radius:50%;background:#059669}
+.status span{font-size:11px;color:#64748b}
+.content{display:flex;flex-direction:column;height:calc(100vh - 52px)}
+.home{padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
+.home h2{font-family:'Fraunces',serif;font-size:28px;color:#1a1a2e;margin-bottom:8px}
+.home .sub{font-size:14px;color:#6b7c8f;margin-bottom:32px;line-height:1.6}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;cursor:pointer;transition:all 0.2s;text-decoration:none;color:inherit;display:block}
+.card:hover{border-color:#2563eb;box-shadow:0 4px 12px rgba(37,99,235,0.08);transform:translateY(-2px)}
+.card .icon{font-size:28px;margin-bottom:12px}
+.card h3{font-size:16px;font-weight:600;color:#1a1a2e;margin-bottom:6px}
+.card p{font-size:13px;color:#6b7c8f;line-height:1.5}
+.card .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:10px;text-transform:uppercase;letter-spacing:0.5px}
+.card .live{background:#ecfdf5;color:#065f46}
+.card .beta{background:#eff6ff;color:#1e40af}
+.card .cal{background:#fef3c7;color:#92400e}
+.frame-wrap{flex:1;display:none}
+.frame-wrap.active{display:flex;flex-direction:column}
+.frame-wrap iframe{flex:1;border:none;width:100%}
+.frame-bar{display:flex;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #e2e8f0;gap:12px}
+.frame-bar .title{font-size:13px;font-weight:600;color:#1a1a2e}
+.frame-bar .close{margin-left:auto;padding:4px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;cursor:pointer;color:#64748b;font-family:inherit}
+.frame-bar .close:hover{background:#e2e8f0}
+@media(max-width:600px){.tabs{margin-left:0;width:100%;overflow-x:auto}.logo .sub{display:none}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">
+    <div class="dot"></div>
+    <div><h1>Caritas AI</h1><span class="sub">NDIS Behaviour Support</span></div>
+  </div>
+  <div class="tabs" id="tabs">
+    <a class="tab active" data-tab="home">Home</a>
+    <a class="tab" data-tab="quality">Quality Check</a>
+    <a class="tab" data-tab="deidentify">De-Identify</a>
+    <a class="tab" data-tab="review">Guided Review</a>
+    <a class="tab" data-tab="builder">BSP Builder</a>
+  </div>
+  <div class="status"><div class="dot" id="statusDot"></div><span id="statusText">Checking...</span></div>
+</div>
+
+<div class="content">
+  <div class="home" id="pane-home">
+    <h2>NDIS BSP Quality Platform</h2>
+    <div class="sub">Upload, evaluate, and improve Behaviour Support Plans against NDIS Practice Standards, PBS frameworks, and Commission requirements.</div>
+    <div class="cards">
+      <a class="card" onclick="switchTab('quality')">
+        <div class="icon">&#128203;</div>
+        <h3>BSP Quality Check</h3>
+        <p>Upload a BSP to evaluate quality, compliance, and clinical adequacy. Scores 7 domains with evidence-traced flags.</p>
+        <span class="badge live">Live v6.2</span>
+      </a>
+      <a class="card" onclick="switchTab('deidentify')">
+        <div class="icon">&#128274;</div>
+        <h3>De-Identification</h3>
+        <p>Remove personal identifiable information from BSPs before sharing or review. LLM-validated name detection.</p>
+        <span class="badge live">Live v2.0</span>
+      </a>
+      <a class="card" onclick="switchTab('review')">
+        <div class="icon">&#128221;</div>
+        <h3>Guided Clinical Review</h3>
+        <p>16-screen structured review workflow for clinical practitioners. Independent assessment with system comparison.</p>
+        <span class="badge cal">Calibration</span>
+      </a>
+      <a class="card" onclick="switchTab('builder')">
+        <div class="icon">&#128295;</div>
+        <h3>BSP Builder</h3>
+        <p>AI-assisted BSP authoring with integrated quality evaluation. Build, edit, and evaluate in one workflow.</p>
+        <span class="badge beta">Beta</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="frame-wrap" id="pane-quality">
+    <div class="frame-bar"><span class="title">BSP Quality Check</span><button class="close" onclick="switchTab('home')">Back to Home</button></div>
+    <iframe id="frame-quality"></iframe>
+  </div>
+  <div class="frame-wrap" id="pane-deidentify">
+    <div class="frame-bar"><span class="title">De-Identification</span><button class="close" onclick="switchTab('home')">Back to Home</button></div>
+    <iframe id="frame-deidentify"></iframe>
+  </div>
+  <div class="frame-wrap" id="pane-review">
+    <div class="frame-bar"><span class="title">Guided Clinical Review</span><button class="close" onclick="switchTab('home')">Back to Home</button></div>
+    <iframe id="frame-review"></iframe>
+  </div>
+  <div class="frame-wrap" id="pane-builder">
+    <div class="frame-bar"><span class="title">BSP Builder</span><button class="close" onclick="switchTab('home')">Back to Home</button></div>
+    <iframe id="frame-builder"></iframe>
+  </div>
+</div>
+
+<script>
+var TABS = {
+  quality:    { src: 'bsp-quality-check.html?embedded=true' },
+  deidentify: { src: 'deidentify.html?embedded=true' },
+  review:     { src: 'guided-marking.html?embedded=true' },
+  builder:    { src: 'bsp-builder.html?embedded=true' }
+};
+var loaded = {};
+
+function switchTab(name) {
+  // Update tab styling
+  document.querySelectorAll('.tab').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.tab === name);
+  });
+
+  // Show/hide panes
+  document.getElementById('pane-home').style.display = name === 'home' ? 'block' : 'none';
+  document.querySelectorAll('.frame-wrap').forEach(function(p) { p.classList.remove('active'); });
+
+  if (name !== 'home') {
+    var pane = document.getElementById('pane-' + name);
+    if (pane) pane.classList.add('active');
+
+    // Lazy load iframe
+    if (TABS[name] && !loaded[name]) {
+      loaded[name] = true;
+      document.getElementById('frame-' + name).src = TABS[name].src;
+    }
+  }
+
+  // URL hash
+  history.replaceState(null, '', name === 'home' ? '#' : '#' + name);
+}
+
+// Wire tab clicks
+document.querySelectorAll('.tab[data-tab]').forEach(function(tab) {
+  tab.addEventListener('click', function(e) {
+    e.preventDefault();
+    switchTab(tab.dataset.tab);
+  });
+});
+
+// Hash routing on load
+var hash = location.hash.replace('#', '').trim();
+if (hash && TABS[hash]) switchTab(hash);
+
+// Health check
+fetch("https://jbgzlxtqnrctpsnvjort.supabase.co/functions/v1/bsp-evaluator", { method: "OPTIONS" })
+  .then(function(r) {
+    if (r.ok || r.status === 204) {
+      document.getElementById("statusDot").style.background = "#059669";
+      document.getElementById("statusText").textContent = "Services online";
+    } else {
+      document.getElementById("statusDot").style.background = "#d97706";
+      document.getElementById("statusText").textContent = "Degraded";
+    }
+  }).catch(function() {
+    document.getElementById("statusDot").style.background = "#dc2626";
+    document.getElementById("statusText").textContent = "Offline";
+  });
+</script>
+</body>
+</html>

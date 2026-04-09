@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caritas AI — De-Identification</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#1B4965;--navy-light:#EDF2F7;--slate:#4A5B6D;--muted:#6B7D8E;--dim:#6B7D8E;--border:#D5DDE5;--bg-alt:#F7F9FB;--white:#FFFFFF;--green:#2D936C;--green-bg:#E8F5EE;--amber:#C47F17;--amber-bg:#FDF4E3;--red:#C0392B;--red-bg:#FCEAE8;--font-serif:'Source Serif 4',Georgia,serif;--font-sans:'DM Sans',-apple-system,sans-serif;--font-mono:'DM Mono','SF Mono',monospace}
+body{font-family:var(--font-sans);background:#F8FAFB;color:#1B2A3D;-webkit-font-smoothing:antialiased}
+.shell{max-width:720px;margin:0 auto;min-height:100dvh;padding:0 16px}
+.header{display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-bottom:1px solid #EDF0F3;margin-bottom:24px}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-logo{width:32px;height:32px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;font-family:var(--font-mono)}
+.header-name{font-size:16px;font-weight:600;color:#1B2A3D}
+.header-sub{font-size:12px;color:var(--dim);font-family:var(--font-mono);background:var(--navy-light);padding:3px 10px;border-radius:4px}
+.card{background:var(--white);border-radius:12px;border:1px solid var(--border);padding:24px;margin-bottom:16px}
+.card-title{font-size:16px;font-weight:700;color:#1B2A3D;font-family:var(--font-serif);margin-bottom:4px}
+.card-desc{font-size:13px;color:var(--muted);margin-bottom:16px}
+.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-alt);margin-bottom:12px}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--navy);background:var(--navy-light)}
+.upload-zone-icon{font-size:32px;margin-bottom:6px;color:var(--dim)}
+.upload-zone-text{font-size:14px;color:var(--slate);font-weight:500}
+.upload-zone-hint{font-size:12px;color:var(--dim);margin-top:4px}
+.or-divider{text-align:center;color:var(--dim);font-size:11px;font-weight:600;letter-spacing:1.2px;font-family:var(--font-mono);margin:12px 0;text-transform:uppercase}
+textarea.field{width:100%;padding:14px;border-radius:10px;border:2px solid var(--border);font-size:14px;font-family:var(--font-sans);line-height:1.6;resize:vertical;outline:none}
+textarea.field:focus{border-color:var(--navy)}
+.char-count{font-size:11px;color:var(--dim);font-family:var(--font-mono);text-align:right;margin-top:4px}
+.btn{border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font-sans);transition:all 0.15s}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:hover{background:#153A52}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed}
+.btn-secondary{background:var(--navy-light);color:var(--navy);border:1px solid var(--border)}
+.btn-secondary:hover{background:#DCE4ED}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.sample-btn{font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;font-family:var(--font-mono);text-decoration:underline;padding:0}
+.pipeline{display:flex;gap:4px;margin:16px 0}
+.pipeline-step{flex:1;text-align:center;padding:8px 4px;border-radius:6px;font-size:10px;font-weight:600;font-family:var(--font-mono);letter-spacing:0.5px;background:#EDF0F3;color:var(--dim);transition:all 0.3s}
+.pipeline-step.active{background:var(--amber-bg);color:var(--amber)}
+.pipeline-step.done{background:var(--green-bg);color:var(--green)}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px}
+.stat-card{background:var(--bg-alt);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--border)}
+.stat-value{font-size:22px;font-weight:700;color:var(--navy);font-family:var(--font-mono)}
+.stat-label{font-size:10px;color:var(--dim);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.8px;margin-top:2px}
+.cat-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.cat-badge{font-size:11px;font-weight:600;font-family:var(--font-mono);padding:4px 10px;border-radius:6px;display:flex;align-items:center;gap:4px}
+.output-box{background:#F8FAFB;border:1px solid var(--border);border-radius:8px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;word-wrap:break-word;max-height:400px;overflow-y:auto;font-family:var(--font-sans)}
+.pii-tag{background:#FDE8E8;color:#C0392B;padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:12px;font-weight:600}
+.review-header{background:#FFFBEB;margin:-24px -24px 16px;padding:16px 24px;border-radius:12px 12px 0 0;border-bottom:1px solid #FDE68A}
+.review-title{font-size:15px;font-weight:700;color:var(--amber);font-family:var(--font-serif)}
+.review-desc{font-size:12px;color:var(--dim);margin-top:2px}
+.flagged-item{padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.flagged-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.flagged-cat{font-size:10px;font-weight:700;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px}
+.flagged-conf{font-size:11px;color:var(--dim);font-family:var(--font-mono)}
+.flagged-context{font-size:13px;color:var(--slate);line-height:1.5;margin-bottom:8px}
+.flagged-actions{display:flex;gap:6px}
+.flagged-btn{font-size:11px;font-weight:600;padding:4px 12px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--white);font-family:var(--font-mono);transition:all 0.15s}
+.flagged-btn.confirm:hover,.flagged-btn.confirm.active{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.flagged-btn.unmask:hover,.flagged-btn.unmask.active{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+.audit-ref{font-size:11px;color:var(--dim);font-family:var(--font-mono);background:var(--bg-alt);padding:4px 10px;border-radius:4px}
+.mode-tag{font-size:10px;font-family:var(--font-mono);padding:3px 8px;border-radius:4px;font-weight:600}
+.mode-tag.api{background:var(--green-bg);color:var(--green)}
+.mode-tag.local{background:var(--amber-bg);color:var(--amber)}
+.status-msg{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:12px}
+.hidden{display:none}
+@media(max-width:480px){.shell{padding:0 12px}.card{padding:16px}.stats-row{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="header">
+    <div class="header-brand">
+      <div class="header-logo">C</div>
+      <span class="header-name">Caritas AI</span>
+    </div>
+    <span class="header-sub">De-Identification</span>
+  </div>
+  <div id="input-section">
+    <div class="card">
+      <div class="card-title">De-Identify a Document</div>
+      <div class="card-desc">Upload or paste a document to remove personal identifiable information. All PII is stripped before any AI processing.</div>
+      <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" style="display:none">
+      <div class="upload-zone" id="upload-zone">
+        <div class="upload-zone-icon">&#8593;</div>
+        <div class="upload-zone-text">Click to upload or drag a file here</div>
+        <div class="upload-zone-hint">Accepts PDF, Word, and text files</div>
+      </div>
+      <div id="upload-status" class="hidden"></div>
+      <div class="or-divider">or paste text directly</div>
+      <textarea class="field" id="text-input" rows="8" placeholder="Paste document text here..."></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <button class="sample-btn" id="sample-btn">Load sample text</button>
+        <div class="char-count" id="char-count">0 characters</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="run-btn" disabled>De-Identify Document</button>
+      </div>
+    </div>
+  </div>
+  <div id="loading-section" class="hidden">
+    <div class="card" style="text-align:center;padding:40px 24px">
+      <div style="width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px"></div>
+      <div id="loading-text" style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Connecting...</div>
+      <div class="pipeline" id="pipeline"></div>
+    </div>
+  </div>
+  <div id="results-section" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="card-title">De-Identification Complete</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="mode-tag" id="mode-tag"></span>
+          <span class="audit-ref" id="audit-ref"></span>
+        </div>
+      </div>
+      <div class="stats-row" id="stats-row"></div>
+      <div class="cat-grid" id="cat-grid"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title">Sanitised Output</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" id="copy-btn">Copy</button>
+          <button class="btn btn-secondary btn-sm" id="download-btn">Download</button>
+        </div>
+      </div>
+      <div class="output-box" id="output-box"></div>
+    </div>
+    <div id="review-section" class="hidden">
+      <div class="card">
+        <div class="review-header">
+          <div class="review-title" id="review-title">Review Required</div>
+          <div class="review-desc">Medium-confidence detections need human confirmation.</div>
+        </div>
+        <div id="flagged-list"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="submit-review-btn">Confirm All Decisions</button>
+        </div>
+      </div>
+    </div>
+    <div id="handoff-msg" class="hidden"></div>
+    <div class="btn-row" style="margin-bottom:40px">
+      <button class="btn btn-secondary" id="reset-btn">De-Identify Another Document</button>
+      <button class="btn btn-primary" id="continue-btn">Continue to BSP Review &rarr;</button>
+    </div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}
+.review-progress{display:flex;align-items:center;gap:12px;padding:12px 0;margin-bottom:12px;border-bottom:1px solid var(--border,#D5DDE5)}
+.review-progress .prog-bar{flex:1;height:6px;background:#EDF0F3;border-radius:3px;overflow:hidden}
+.review-progress .prog-fill{height:100%;background:var(--green,#2D936C);border-radius:3px;transition:width 0.3s}
+.review-progress .prog-text{font-size:13px;color:var(--muted,#6B7D8E);white-space:nowrap}
+</style>
+<script>
+(function(){
+"use strict";
+
+var SUPABASE_URL = "https://jbgzlxtqnrctpsnvjort.supabase.co";
+var ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZ3pseHRxbnJjdHBzbnZqb3J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTA5NzUsImV4cCI6MjA4ODkyNjk3NX0.YmayaIMNiUDP5jci3sxd2nkg_2-7IRYS5ORwlOuEgIE";
+var DEID_URL = SUPABASE_URL + "/functions/v1/standalone-deidentify";
+
+var currentResult = null;
+var reviewDecisions = {};
+var usedLocalFallback = false;
+
+var CAT_COLORS = {NAME:"#dc2626",ADDRESS:"#3b82f6",CONTACT:"#16a34a",DOB:"#ec4899",NDIS_ID:"#0ea5e9",GUARDIAN:"#f97316",PROVIDER:"#8b5cf6",FINANCIAL:"#d97706",SCHOOL:"#d97706",HOSPITAL:"#e11d48",LOCATION:"#6366f1",MEDICARE:"#a855f7",EMAIL:"#14b8a6",PHONE:"#16a34a",ABN:"#8b5cf6",TFN:"#dc2626"};
+
+var PHASES = [{key:"extracting",label:"Extract"},{key:"detecting",label:"Detect PII"},{key:"analysing",label:"Analyse"},{key:"masking",label:"Mask"},{key:"assembling",label:"Assemble"}];
+
+var SAMPLE = "James Wilson (DOB: 14/05/1998, NDIS number 431298765) lives at 15 Elm Court, Wendouree VIC 3355. His mother Ruth Wilson is his primary carer. Support worker Maria Lopez from Sunrise Support Services Pty Ltd (ABN: 12 345 678 901) assists three times per week. Contact Maria at maria@sunshine.com.au or 0412 345 678.\n\nJames attends Ballarat Primary School and has regular appointments at Ballarat Base Hospital with Dr Sarah Chen. Guardian: Susan Wilson (substitute decision-maker).\n\nRecent incident: On 12/02/2026, James became distressed during a transition between activities at school. His teacher Ms Katie Brown contacted Ruth immediately.";
+
+// ── LOCAL PII FALLBACK ──
+var PII_PATTERNS = [
+  {cat:"NAME", re:/\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/g, conf:0.6},
+  {cat:"DOB", re:/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, conf:0.9},
+  {cat:"NDIS_ID", re:/\b(?:NDIS\s*(?:number|no\.?|#)?\s*)?[34]\d{8}\b/gi, conf:0.95},
+  {cat:"EMAIL", re:/\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/g, conf:0.95},
+  {cat:"PHONE", re:/\b(?:0[2-478]\d{2}\s?\d{3}\s?\d{3}|04\d{2}\s?\d{3}\s?\d{3}|\+61\s?\d\s?\d{4}\s?\d{4})\b/g, conf:0.9},
+  {cat:"ABN", re:/\b(?:ABN:?\s*)?\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b/gi, conf:0.85},
+  {cat:"ADDRESS", re:/\b\d{1,5}\s+[A-Z][a-z]+\s+(?:St(?:reet)?|Rd|Road|Ave(?:nue)?|Dr(?:ive)?|Ct|Court|Cr(?:escent)?|Pl(?:ace)?|Way|Ln|Lane|Blvd|Pde|Parade)\b[^.]*?\b(?:VIC|NSW|QLD|SA|WA|TAS|NT|ACT)\s+\d{4}\b/gi, conf:0.85},
+  {cat:"MEDICARE", re:/\b\d{4}\s?\d{5}\s?\d{1}\b/g, conf:0.7},
+];
+
+function localDeidentify(text) {
+  var sanitised = text;
+  var detections = [];
+  var counters = {};
+
+  for (var p = 0; p < PII_PATTERNS.length; p++) {
+    var pat = PII_PATTERNS[p];
+    var re = new RegExp(pat.re.source, pat.re.flags);
+    var match;
+    while ((match = re.exec(text)) !== null) {
+      var idx = counters[pat.cat] ? counters[pat.cat] + 1 : 1;
+      counters[pat.cat] = idx;
+      detections.push({
+        category: pat.cat,
+        confidence: pat.conf,
+        original: match[0],
+        replacement: "[" + pat.cat + (idx > 1 ? "_" + idx : "") + "]",
+        position_start: match.index,
+        context: text.substring(Math.max(0, match.index - 20), Math.min(text.length, match.index + match[0].length + 20))
+      });
+    }
+  }
+
+  // Sort by position descending so replacements don't shift indices
+  detections.sort(function(a, b) { return b.position_start - a.position_start; });
+  for (var d = 0; d < detections.length; d++) {
+    sanitised = sanitised.substring(0, detections[d].position_start) + detections[d].replacement + sanitised.substring(detections[d].position_start + detections[d].original.length);
+  }
+
+  var byCat = {};
+  var byConf = {high: 0, medium: 0, low: 0};
+  var flagged = [];
+  for (var i = 0; i < detections.length; i++) {
+    var det = detections[i];
+    byCat[det.category] = (byCat[det.category] || 0) + 1;
+    if (det.confidence >= 0.9) byConf.high++;
+    else if (det.confidence >= 0.7) { byConf.medium++; flagged.push({item_id: "LOCAL-" + i, category: det.category, confidence: det.confidence, confidence_tier: "medium", context: det.context}); }
+    else { byConf.low++; flagged.push({item_id: "LOCAL-" + i, category: det.category, confidence: det.confidence, confidence_tier: "low", context: det.context}); }
+  }
+
+  return {
+    status: flagged.length > 0 ? "review_required" : "approved",
+    sanitised_text: sanitised,
+    original_length: text.length,
+    sanitised_length: sanitised.length,
+    audit_reference: "LOCAL-" + Date.now(),
+    processing_duration_ms: 0,
+    detection_summary: {
+      total_detections: detections.length,
+      by_category: byCat,
+      by_confidence_tier: byConf,
+      auto_masked: byConf.high,
+      flagged_for_review: flagged.length,
+      escalated: 0
+    },
+    flagged_items: flagged
+  }; initRC(flagged.length);
+}
+
+// ── DOM REFS ──
+var textInput = document.getElementById("text-input");
+var runBtn = document.getElementById("run-btn");
+var fileInput = document.getElementById("file-input");
+var uploadZone = document.getElementById("upload-zone");
+
+// ── EVENT LISTENERS ──
+textInput.addEventListener("input", function() {
+  document.getElementById("char-count").textContent = this.value.length.toLocaleString() + " characters";
+  runBtn.disabled = this.value.trim().length < 20;
+});
+
+document.getElementById("sample-btn").addEventListener("click", function() {
+  textInput.value = SAMPLE;
+  document.getElementById("char-count").textContent = SAMPLE.length.toLocaleString() + " characters";
+  runBtn.disabled = false;
+});
+
+uploadZone.addEventListener("click", function() { fileInput.click(); });
+uploadZone.addEventListener("dragover", function(e) { e.preventDefault(); this.classList.add("dragover"); });
+uploadZone.addEventListener("dragleave", function(e) { e.preventDefault(); this.classList.remove("dragover"); });
+uploadZone.addEventListener("drop", function(e) { e.preventDefault(); this.classList.remove("dragover"); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener("change", function(e) { if (e.target.files[0]) handleFile(e.target.files[0]); });
+document.addEventListener("dragover", function(e) { e.preventDefault(); });
+document.addEventListener("drop", function(e) { e.preventDefault(); });
+
+runBtn.addEventListener("click", runDeidentify);
+document.getElementById("copy-btn").addEventListener("click", copySanitised);
+document.getElementById("download-btn").addEventListener("click", downloadSanitised);
+document.getElementById("reset-btn").addEventListener("click", resetAll);
+document.getElementById("continue-btn").addEventListener("click", continueToReview);
+document.getElementById("submit-review-btn").addEventListener("click", submitReview);
+
+// ── FILE HANDLING ──
+function showStatus(msg, type) {
+  var el = document.getElementById("upload-status");
+  el.className = "status-msg " + type;
+  el.textContent = msg;
+}
+
+function hideStatus() {
+  document.getElementById("upload-status").className = "hidden";
+}
+
+async function handleFile(file) {
+  var name = file.name.toLowerCase();
+  if (!name.endsWith(".pdf") && !name.endsWith(".docx") && !name.endsWith(".doc") && !name.endsWith(".txt")) {
+    showStatus("Unsupported file type. Use PDF, Word, or text files.", "error");
+    return;
+  }
+  showStatus("Extracting text from " + file.name + "...", "");
+  document.getElementById("upload-status").style.background = "#EDF2F7";
+  document.getElementById("upload-status").style.color = "#1B4965";
+  try {
+    var text = "";
+    if (name.endsWith(".pdf")) { text = await extractPDF(file); }
+    else if (name.endsWith(".docx") || name.endsWith(".doc")) { text = await extractDOCX(file); }
+    else { text = await file.text(); }
+    if (!text || text.trim().length < 10) { showStatus("Could not extract text. File may be scanned or image-based.", "error"); return; }
+    textInput.value = text;
+    document.getElementById("char-count").textContent = text.length.toLocaleString() + " characters";
+    runBtn.disabled = false;
+    showStatus("Extracted " + text.length.toLocaleString() + " characters from " + file.name, "success");
+  } catch (e) { showStatus("Error: " + e.message, "error"); }
+}
+
+async function extractPDF(file) {
+  var buf = await file.arrayBuffer();
+  if (typeof pdfjsLib === "undefined") throw new Error("PDF library not loaded.");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  var text = "";
+  for (var i = 1; i <= pdf.numPages; i++) { var pg = await pdf.getPage(i); var c = await pg.getTextContent(); text += c.items.map(function(it) { return it.str; }).join(" ") + "\n"; }
+  return text.trim();
+}
+
+async function extractDOCX(file) {
+  var buf = await file.arrayBuffer();
+  if (typeof mammoth === "undefined") throw new Error("DOCX library not loaded.");
+  var res = await mammoth.extractRawText({ arrayBuffer: buf });
+  return res.value.trim();
+}
+
+// ── PIPELINE DISPLAY ──
+function showPipeline(phase) {
+  var el = document.getElementById("pipeline");
+  var idx = -1;
+  for (var i = 0; i < PHASES.length; i++) { if (PHASES[i].key === phase) idx = i; }
+  var html = "";
+  for (var j = 0; j < PHASES.length; j++) {
+    var cls = j < idx ? "done" : (j === idx ? "active" : "");
+    html += '<div class="pipeline-step ' + cls + '">' + PHASES[j].label + '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function showAllDone() {
+  var el = document.getElementById("pipeline");
+  var html = "";
+  for (var j = 0; j < PHASES.length; j++) { html += '<div class="pipeline-step done">' + PHASES[j].label + '</div>'; }
+  el.innerHTML = html;
+}
+
+// ── MAIN RUN ──
+async function runDeidentify() {
+  var text = textInput.value.trim();
+  if (text.length < 20) return;
+
+  document.getElementById("input-section").classList.add("hidden");
+  document.getElementById("results-section").classList.add("hidden");
+  document.getElementById("loading-section").classList.remove("hidden");
+  hideStatus();
+
+  var loadText = document.getElementById("loading-text");
+  loadText.textContent = "Running de-identification pipeline...";
+
+  var phaseIdx = 0;
+  showPipeline(PHASES[0].key);
+  var timer = setInterval(function() { phaseIdx++; if (phaseIdx < PHASES.length) showPipeline(PHASES[phaseIdx].key); }, 400);
+
+  usedLocalFallback = false;
+
+  try {
+    var res = await fetch(DEID_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ANON_KEY, "apikey": ANON_KEY },
+      body: JSON.stringify({ text: text, include_report: true })
+    });
+    var data = await res.json();
+    clearInterval(timer);
+    if (data.error) throw new Error(data.error);
+    currentResult = data;
+  } catch (e) {
+    clearInterval(timer);
+    loadText.textContent = "API unavailable. Running local de-identification...";
+    showPipeline("masking");
+    currentResult = localDeidentify(text);
+    usedLocalFallback = true;
+  }
+
+  showAllDone();
+  loadText.textContent = "Complete.";
+  setTimeout(renderResults, 400);
+}
+
+// ── RENDER ──
+function renderResults() {
+  document.getElementById("loading-section").classList.add("hidden");
+  document.getElementById("results-section").classList.remove("hidden");
+
+  var ds = currentResult.detection_summary || {};
+  var byCat = ds.by_category || {};
+
+  var modeTag = document.getElementById("mode-tag");
+  if (usedLocalFallback) { modeTag.className = "mode-tag local"; modeTag.textContent = "LOCAL"; }
+  else { modeTag.className = "mode-tag api"; modeTag.textContent = "API"; }
+
+  var ref = currentResult.audit_reference || "";
+  document.getElementById("audit-ref").textContent = "Ref: " + ref.substring(0, 8);
+
+  var stats = [
+    { v: ds.total_detections || 0, l: "PII Found" },
+    { v: ds.auto_masked || 0, l: "Auto-masked" },
+    { v: ds.flagged_for_review || 0, l: "For Review" },
+    { v: (currentResult.processing_duration_ms || 0) + "ms", l: "Duration" }
+  ];
+  var statsHtml = "";
+  for (var s = 0; s < stats.length; s++) {
+    statsHtml += '<div class="stat-card"><div class="stat-value">' + stats[s].v + '</div><div class="stat-label">' + stats[s].l + '</div></div>';
+  }
+  document.getElementById("stats-row").innerHTML = statsHtml;
+
+  var catKeys = Object.keys(byCat);
+  var catHtml = "";
+  for (var c = 0; c < catKeys.length; c++) {
+    var cat = catKeys[c];
+    var color = CAT_COLORS[cat] || "#666";
+    catHtml += '<div class="cat-badge" style="background:' + color + '11;color:' + color + ';border:1px solid ' + color + '33"><span style="font-weight:700">' + byCat[cat] + '</span> ' + cat + '</div>';
+  }
+  document.getElementById("cat-grid").innerHTML = catHtml;
+
+  var sanitised = currentResult.sanitised_text || "";
+  var highlighted = sanitised.replace(/\[([A-Z_]+(?:_\d+)?)\]/g, function(match, tag) {
+    var baseCat = tag.replace(/_\d+$/, "");
+    var color = CAT_COLORS[baseCat] || "#666";
+    return '<span class="pii-tag" style="background:' + color + '15;color:' + color + '">' + match + '</span>';
+  });
+  document.getElementById("output-box").innerHTML = highlighted;
+
+  var flagged = currentResult.flagged_items || [];
+  if (flagged.length > 0) {
+    document.getElementById("review-section").classList.remove("hidden");
+    document.getElementById("review-title").textContent = "Review Required \u2014 " + flagged.length + " items";
+    var listHtml = "";
+    for (var f = 0; f < flagged.length; f++) {
+      var item = flagged[f];
+      var fc = CAT_COLORS[item.category] || "#666";
+      var conf = Math.round((item.confidence || 0) * 100);
+      var ctx = escapeHtml(item.context || "");
+      listHtml += '<div class="flagged-item" id="flagged-' + f + '">';
+      listHtml += '<div class="flagged-header"><span class="flagged-cat" style="background:' + fc + '15;color:' + fc + '">' + (item.category || "") + '</span>';
+      listHtml += '<span class="flagged-conf">' + conf + '% confidence</span></div>';
+      listHtml += '<div class="flagged-context">' + ctx + '</div>';
+      listHtml += '<div class="flagged-actions">';
+      listHtml += '<button class="flagged-btn confirm" data-idx="' + f + '">Confirm Mask</button>';
+      listHtml += '<button class="flagged-btn unmask" data-idx="' + f + '">Unmask</button>';
+      listHtml += '</div></div>';
+    }
+    document.getElementById("flagged-list").innerHTML = listHtml;
+
+    // Attach click handlers
+    var allBtns = document.querySelectorAll(".flagged-btn");
+    for (var b = 0; b < allBtns.length; b++) {
+      allBtns[b].addEventListener("click", function() {
+        var idx = this.getAttribute("data-idx");
+        bumpRC(); var action = this.classList.contains("confirm") ? "confirm" : "unmask";
+        reviewDecisions[idx] = action;
+        var parent = this.parentElement;
+        var siblings = parent.querySelectorAll(".flagged-btn");
+        for (var x = 0; x < siblings.length; x++) siblings[x].classList.remove("active");
+        this.classList.add("active");
+      });
+    }
+  } else {
+    document.getElementById("review-section").classList.add("hidden");
+  }
+}
+
+function escapeHtml(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+function copySanitised() {
+  var text = currentResult ? currentResult.sanitised_text : "";
+  if (!text) return;
+  navigator.clipboard.writeText(text);
+  var btn = document.getElementById("copy-btn");
+  btn.textContent = "Copied!";
+  setTimeout(function() { btn.textContent = "Copy"; }, 1500);
+}
+
+function downloadSanitised() {
+  var text = currentResult ? currentResult.sanitised_text : "";
+  if (!text) return;
+  var blob = new Blob([text], { type: "text/plain" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = "sanitised-" + new Date().toISOString().slice(0, 10) + ".txt";
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function submitReview() {
+  var btn = document.getElementById("submit-review-btn");
+  btn.textContent = "Review Submitted \u2713";
+  btn.disabled = true;
+  btn.style.background = "#2D936C";
+}
+
+function continueToReview() {
+  var text = currentResult ? currentResult.sanitised_text : "";
+  if (!text) { alert("No sanitised text available."); return; }
+  navigator.clipboard.writeText(text).then(function() {
+    var msg = document.getElementById("handoff-msg");
+    msg.className = "status-msg success";
+    msg.textContent = "Sanitised text copied to clipboard. Opening BSP Review \u2014 paste the text there.";
+    setTimeout(function() { window.open("guided-marking.html", "_blank"); }, 800);
+  });
+}
+
+function resetAll() {
+  currentResult = null;
+  reviewDecisions = {};
+  document.getElementById("results-section").classList.add("hidden");
+  document.getElementById("review-section").classList.add("hidden");
+  document.getElementById("handoff-msg").className = "hidden";
+  document.getElementById("input-section").classList.remove("hidden");
+  hideStatus();
+  textInput.value = "";
+  document.getElementById("char-count").textContent = "0 characters";
+  runBtn.disabled = true;
+}
+
+})();
+</script>
+
+<script>
+var _rvT=0,_rvD=0;
+function initRC(n){_rvT=n;_rvD=0;_rRC();}
+function bumpRC(){_rvD++;_rRC();}
+function _rRC(){
+  var el=document.getElementById('review-progress-bar');
+  if(!el)return;
+  var p=_rvT>0?Math.round((_rvD/_rvT)*100):0;
+  el.innerHTML='<div class="review-progress"><span class="prog-text">Reviewed '+_rvD+' of '+_rvT+'</span><div class="prog-bar"><div class="prog-fill" style="width:'+p+'%"></div></div><span class="prog-text">'+p+'%</span></div>';
+}
+
+if (window.location.search.indexOf("embedded=true") !== -1) {
+  document.addEventListener("DOMContentLoaded", function() {
+    var hdr = document.querySelector(".header");
+    if (hdr) hdr.style.display = "none";
+    var ctr = document.querySelector(".container");
+    if (ctr) ctr.style.paddingTop = "12px";
+  });
+}
+</script>
+</body>
+</html>

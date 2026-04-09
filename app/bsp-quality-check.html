@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BSP Quality Check — Caritas AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.0/docx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f7f5f0;--card:#fff;--text:#1a1a1a;--muted:#6b7280;--border:#e8e4dd;
+  --accent:#2563eb;--accent-light:#dbeafe;
+  --green:#059669;--green-light:#d1fae5;
+  --amber:#d97706;--amber-light:#fef3c7;
+  --red:#dc2626;--red-light:#fee2e2;
+  --critical:#7c2d12;--critical-light:#ffedd5;
+  --radius:10px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+
+/* Header */
+.header{background:#1a1a2e;color:white;padding:20px 0;text-align:center}
+.header h1{font-family:'Fraunces',serif;font-size:24px;font-weight:600;letter-spacing:-0.5px}
+.header .sub{font-size:13px;color:#94a3b8;margin-top:2px}
+
+/* Container */
+.container{max-width:780px;margin:0 auto;padding:24px 16px 80px}
+
+/* Cards */
+.card{background:var(--card);border-radius:var(--radius);padding:24px;margin-bottom:16px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.card-title{font-weight:600;font-size:15px;margin-bottom:12px;color:var(--text)}
+
+/* File upload */
+.drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all 0.2s}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
+.drop-zone strong{display:block;font-size:15px;margin-bottom:4px}
+.drop-zone span{font-size:13px;color:var(--muted)}
+.file-banner{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px;color:#166534;display:none}
+.file-banner.show{display:block}
+
+/* Textarea */
+textarea{width:100%;min-height:160px;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:14px;font-family:'DM Sans',sans-serif;resize:vertical;margin-top:12px;line-height:1.5}
+textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,0.1)}
+.char-count{font-size:12px;color:var(--muted);margin-top:4px;text-align:right}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:500;border:none;cursor:pointer;transition:all 0.15s;font-family:'DM Sans',sans-serif}
+.btn-primary{background:var(--accent);color:white}
+.btn-primary:hover{background:#1d4ed8}
+.btn-primary:disabled{background:#94a3b8;cursor:not-allowed}
+.btn-secondary{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn-secondary:hover{background:var(--accent-light)}
+.btn-export{background:#059669;color:white}
+.btn-export:hover{background:#047857}
+.btn-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+
+/* Loading */
+.loading-section{display:none;text-align:center;padding:60px 20px}
+.loading-section.show{display:block}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top:3px solid var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.step-label{font-size:15px;font-weight:500;margin-bottom:4px}
+.step-detail{font-size:13px;color:var(--muted)}
+.deid-banner{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin:16px auto;max-width:400px;font-size:13px;color:#166534;display:none}
+.deid-banner.show{display:block}
+.deid-cats{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.deid-cat{background:#dcfce7;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+
+/* Results */
+.results-section{display:none}
+.results-section.show{display:block}
+
+/* Score hero */
+.score-hero{display:flex;align-items:center;gap:24px;padding:24px}
+.score-circle{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.score-circle .num{font-family:'Fraunces',serif;font-size:36px;font-weight:700;color:white}
+.score-meta h2{font-family:'Fraunces',serif;font-size:20px;font-weight:600}
+.score-meta .rec{font-size:14px;color:var(--muted);margin-top:4px;line-height:1.5}
+.band-badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;margin-top:8px}
+.profile-badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-top:8px;margin-left:6px;background:#f3f4f6;color:#374151}
+
+/* Bands */
+.band-low{background:var(--green-light);color:var(--green)}
+.band-medium{background:var(--amber-light);color:var(--amber)}
+.band-high{background:var(--red-light);color:var(--red)}
+.band-critical{background:var(--critical-light);color:var(--critical)}
+.bg-low{background:var(--green)}.bg-medium{background:var(--amber)}.bg-high{background:var(--red)}.bg-critical{background:var(--critical)}
+
+/* Domains */
+.domain-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6}
+.domain-row:last-child{border:none}
+.domain-name{width:160px;font-size:13px;font-weight:500;flex-shrink:0}
+.domain-bar-wrap{flex:1;height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden}
+.domain-bar{height:100%;border-radius:4px;transition:width 0.6s ease}
+.domain-score{width:36px;text-align:right;font-size:13px;font-weight:600;flex-shrink:0}
+
+/* RP Table */
+.rp-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.rp-table th{text-align:left;padding:8px 10px;background:#f9fafb;font-weight:600;border-bottom:2px solid var(--border);font-size:12px;text-transform:uppercase;color:var(--muted)}
+.rp-table td{padding:8px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+.rp-yes{color:var(--green);font-weight:600}
+.rp-no{color:var(--red);font-weight:600}
+
+/* Flags */
+.flag-item{padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:13px;line-height:1.5}
+.flag-high{background:#fef3f2;border-left:3px solid #f04438}
+.flag-medium{background:#fffaeb;border-left:3px solid #f79009}
+.flag-low{background:#f0f9ff;border-left:3px solid #36bffa}
+.flag-info{background:#f9fafb;border-left:3px solid #98a2b3}
+.flag-code{font-weight:700;text-transform:uppercase;font-size:11px;margin-right:8px}
+
+/* Lists */
+.kv-list{list-style:none;padding:0}
+.kv-list li{padding:6px 0;font-size:14px;line-height:1.5}
+.concern-icon::before{content:"⚠ ";color:var(--amber)}
+.strength-icon::before{content:"✓ ";color:var(--green)}
+
+
+/* Radar chart */
+.radar-wrap{max-width:380px;margin:0 auto;padding:10px 0}
+canvas#radarChart{max-height:300px}
+
+/* Profile badge */
+.profile-section{margin-top:10px}
+.profile-badge{display:inline-block;padding:4px 12px;border-radius:6px;font-size:13px;font-weight:600;margin-right:8px}
+.profile-a{background:#d1fae5;color:#059669}
+.profile-b{background:#dbeafe;color:#2563eb}
+.profile-c{background:#fee2e2;color:#dc2626}
+.profile-d{background:#fef3c7;color:#d97706}
+.profile-e{background:#f3f4f6;color:#374151}
+.profile-explain{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.5}
+
+/* Flag drill-down */
+.flag-item{cursor:pointer;transition:all 0.15s}
+.flag-item:hover{opacity:0.85}
+.flag-detail{display:none;margin-top:8px;padding:10px 12px;background:rgba(0,0,0,0.03);border-radius:6px;font-size:12px;line-height:1.6;color:#4b5563}
+.flag-detail.show{display:block}
+.flag-section-label{font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;margin-bottom:4px}
+.flag-expand{float:right;font-size:11px;color:var(--muted)}
+
+/* Comparison mode */
+.compare-section{display:none}
+.compare-section.show{display:block}
+.compare-row{display:flex;gap:16px;flex-wrap:wrap}
+.compare-col{flex:1;min-width:280px}
+.compare-header{font-weight:600;font-size:14px;margin-bottom:8px;text-align:center}
+.delta{font-size:12px;font-weight:600;margin-left:6px}
+.delta-up{color:var(--green)}
+.delta-down{color:var(--red)}
+.delta-same{color:var(--muted)}
+
+/* Mobile responsive */
+@media(max-width:768px){
+  .score-hero{flex-direction:column;text-align:center}
+  .domain-name{width:100px;font-size:11px}
+  .rp-table{display:block;overflow-x:auto;white-space:nowrap}
+  .radar-wrap{max-width:300px}
+  .compare-row{flex-direction:column}
+  .btn-row{flex-direction:column}
+  .btn{width:100%;justify-content:center}
+  .card{padding:16px}
+}
+@media(max-width:480px){
+  .header h1{font-size:20px}
+  .score-circle{width:80px;height:80px}
+  .score-circle .num{font-size:28px}
+  .domain-name{width:80px;font-size:10px}
+}
+
+/* Footer */
+.footer{text-align:center;padding:24px;font-size:12px;color:var(--muted)}
+
+/* Hidden */
+.hidden{display:none!important}
+
+/* Responsive */
+@media(max-width:600px){
+  .score-hero{flex-direction:column;text-align:center}
+  .domain-name{width:110px;font-size:12px}
+  .rp-table{font-size:11px}
+}
+
+.rp-refine{display:none;border:2px solid #1B496B;background:#f0f9ff;border-radius:8px;padding:16px;margin:16px 0}
+.rp-refine.show{display:block}
+.rp-refine h3{font-size:14px;font-weight:700;color:#1B496B;margin-bottom:8px}
+.rp-refine label{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;font-size:13px;color:#3a4a5a;border-radius:6px}
+.rp-refine label:hover{background:#dbeafe}
+.rp-refine input[type=radio]{accent-color:#1B496B}
+.rp-refine button{margin-top:12px;padding:10px 24px;background:#1B496B;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.rp-refine button:hover{background:#153a52}
+.rp-refine .detected{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.rp-refine .rp-tag{background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;color:#7c2d12}
+.eval-spinner{display:none;text-align:center;padding:30px}
+.eval-spinner.on{display:block}
+.eval-spinner .spin{width:40px;height:40px;border:4px solid #e2e8f0;border-top:4px solid #1B496B;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.eval-spinner .slow{display:none;color:#b45309;font-size:12px;margin-top:8px;font-weight:500}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>BSP Quality Check</h1>
+  <div class="sub">Caritas AI — NDIS Behaviour Support Plan Evaluator</div>
+</div>
+
+<div class="container">
+
+  <!-- INPUT SECTION -->
+  <div id="input-section">
+    <div class="card">
+      <div class="card-title">Upload or Paste BSP</div>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept=".txt,.pdf,.docx,.doc" style="display:none" onchange="handleFile(event)">
+        <strong>Click to upload or drag and drop</strong>
+        <span>Supports PDF, Word (.docx), and plain text (.txt)</span>
+      </div>
+      <div class="file-banner" id="fileBanner"></div>
+      <textarea id="bspInput" placeholder="Or paste the full BSP text here..." oninput="updateCharCount()"></textarea>
+      <div class="char-count" id="charCount">0 characters</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnCheck" onclick="runCheck()">Check BSP Quality</button>
+        <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING SECTION -->
+  <div class="loading-section" id="loading-section">
+    <div class="spinner"></div>
+    <div class="step-label" id="stepLabel">Preparing...</div>
+    <div class="step-detail" id="stepDetail"></div>
+    <div class="deid-banner" id="deidBanner"></div>
+  </div>
+
+  <!-- RESULTS SECTION -->
+  <div class="results-section" id="results-section">
+
+    <!-- Score -->
+    <div class="card" id="scoreCard">
+      
+<div class="eval-spinner" id="evalSpinner">
+  <div class="spin"></div>
+  <div style="font-size:14px;color:#3a4a5a;font-weight:500">Evaluating BSP quality...</div>
+  <div style="font-size:12px;color:#6b7c8f;margin-top:4px">This typically takes 10-15 seconds</div>
+  <div class="slow" id="evalSlow">Taking longer than expected...</div>
+</div>
+
+<div class="rp-refine" id="rpPanel">
+  <h3>Restrictive Practices Detected</h3>
+  <div class="detected" id="rpDetected"></div>
+  <div style="font-size:13px;color:#1a1a2e;font-weight:600;margin-bottom:6px">What is the authorisation status?</div>
+  <label><input type="radio" name="rpRefine" value="authorised"> Authorised &mdash; Commission-approved</label>
+  <label><input type="radio" name="rpRefine" value="unauthorised"> Unauthorised / Pending</label>
+  <button onclick="reEvalWithRP()">Re-evaluate with RP Status</button>
+  <div style="font-size:11px;color:#6b7c8f;margin-top:8px">This adjusts compliance and governance scoring based on authorisation status.</div>
+</div>
+
+<div class="score-hero" id="scoreHero"></div>
+    </div>
+
+    <!-- Domains -->
+    <div class="card">
+      <div class="card-title">Domain Scores</div>
+      <div class="radar-wrap"><canvas width="300" height="300" id="radarChart"></canvas></div>
+      <div id="domainBars"></div>
+    </div>
+
+    <!-- Restrictive Practices -->
+    <div class="card" id="rpCard" style="display:none">
+      <div class="card-title">Restrictive Practices</div>
+      <div id="rpContent"></div>
+    </div>
+
+    <!-- Concerns & Strengths -->
+    <div class="card" id="csCard" style="display:none">
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px" id="concernsCol"></div>
+        <div style="flex:1;min-width:200px" id="strengthsCol"></div>
+      </div>
+    </div>
+
+    <!-- Flags -->
+    <div class="card" id="flagsCard" style="display:none">
+      <div class="card-title">Flags</div>
+      <div id="flagsList"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="card">
+      <div class="btn-row">
+        <button class="btn btn-export" onclick="exportWord()">Export as Word (.docx)</button>
+        <button class="btn btn-secondary" onclick="exportJSON()">Export JSON</button>
+        <button class="btn btn-secondary" onclick="resetAll()">Check Another BSP</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">Caritas AI — De-identification and evaluation powered by Anthropic Claude. Not a substitute for clinical judgement.</div>
+
+<script>
+// ── CONFIG ──
+var SUPABASE_URL = "https://jbgzlxtqnrctpsnvjort.supabase.co";
+var ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZ3pseHRxbnJjdHBzbnZqb3J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTA5NzUsImV4cCI6MjA4ODkyNjk3NX0.YmayaIMNiUDP5jci3sxd2nkg_2-7IRYS5ORwlOuEgIE";
+var DEID_URL = SUPABASE_URL + "/functions/v1/standalone-deidentify";
+var EVAL_URL = SUPABASE_URL + "/functions/v1/bsp-evaluator";
+
+var currentResult = null;
+var deidResult = null;
+var rawText = "";
+
+// ── PDF.js setup ──
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ── FILE HANDLING ──
+var dropZone = document.getElementById("dropZone");
+dropZone.addEventListener("dragover", function(e) { e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", function() { dropZone.classList.remove("dragover"); });
+dropZone.addEventListener("drop", function(e) {
+  e.preventDefault(); dropZone.classList.remove("dragover");
+  if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(e) { if (e.target.files.length) processFile(e.target.files[0]); }
+
+async function processFile(file) {
+  var banner = document.getElementById("fileBanner");
+  var ext = file.name.split(".").pop().toLowerCase();
+
+  if (ext === "pdf") {
+    banner.textContent = "Reading PDF: " + file.name + "...";
+    banner.classList.add("show");
+    try {
+      var buf = await file.arrayBuffer();
+      var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      var text = "";
+      for (var i = 1; i <= pdf.numPages; i++) {
+        var page = await pdf.getPage(i);
+        var content = await page.getTextContent();
+        text += content.items.map(function(it) { return it.str; }).join(" ") + "\n";
+      }
+      document.getElementById("bspInput").value = text;
+      banner.textContent = file.name + " — " + pdf.numPages + " pages, " + text.length.toLocaleString() + " characters";
+      updateCharCount();
+      window._rpStatus = "unknown";
+      setTimeout(function(){ runCheck(); }, 500);
+    } catch (err) {
+      banner.textContent = "Error reading PDF: " + err.message;
+      banner.style.background = "#fef2f2"; banner.style.color = "#991b1b"; banner.style.borderColor = "#fecaca";
+    }
+  } else if (ext === "docx" || ext === "doc") {
+    banner.textContent = "Reading Word document: " + file.name + "...";
+    banner.classList.add("show");
+    try {
+      var buf = await file.arrayBuffer();
+      var result = await mammoth.extractRawText({ arrayBuffer: buf });
+      document.getElementById("bspInput").value = result.value;
+      banner.textContent = file.name + " — " + result.value.length.toLocaleString() + " characters";
+      updateCharCount();
+      window._rpStatus = "unknown";
+      setTimeout(function(){ runCheck(); }, 500);
+    } catch (err) {
+      banner.textContent = "Error reading document: " + err.message;
+      banner.style.background = "#fef2f2"; banner.style.color = "#991b1b"; banner.style.borderColor = "#fecaca";
+    }
+  } else if (ext === "txt") {
+    var reader = new FileReader();
+    reader.onload = function() {
+      document.getElementById("bspInput").value = reader.result;
+      banner.textContent = file.name + " — " + reader.result.length.toLocaleString() + " characters";
+      banner.classList.add("show");
+      updateCharCount();
+    };
+    reader.readAsText(file);
+  } else {
+    banner.textContent = "Unsupported file type. Please use PDF, Word (.docx), or plain text (.txt).";
+    banner.classList.add("show");
+    banner.style.background = "#fef2f2"; banner.style.color = "#991b1b"; banner.style.borderColor = "#fecaca";
+  }
+}
+
+function updateCharCount() {
+  var len = document.getElementById("bspInput").value.length;
+  document.getElementById("charCount").textContent = len.toLocaleString() + " characters";
+}
+
+function clearAll() {
+  document.getElementById("bspInput").value = "";
+  document.getElementById("fileBanner").classList.remove("show");
+  document.getElementById("fileInput").value = "";
+  updateCharCount();
+}
+
+function resetAll() {
+  clearAll();
+  document.getElementById("results-section").classList.remove("show");
+  document.getElementById("input-section").classList.remove("hidden");
+  currentResult = null; deidResult = null; rawText = "";
+}
+
+// ── MAIN CHECK ──
+async function runCheck() {
+  showSpinner();
+  rawText = document.getElementById("bspInput").value.trim();
+  if (rawText.length < 50) { alert("Please paste or upload a BSP with at least 50 characters."); return; }
+
+  document.getElementById("input-section").classList.add("hidden");
+  document.getElementById("results-section").classList.remove("show");
+  var loading = document.getElementById("loading-section");
+  loading.classList.add("show");
+
+  var stepLabel = document.getElementById("stepLabel");
+  var stepDetail = document.getElementById("stepDetail");
+  var deidBanner = document.getElementById("deidBanner");
+  deidBanner.classList.remove("show");
+
+  var sanitisedText = rawText;
+  deidResult = null;
+
+  // Step 1: De-identify
+  stepLabel.textContent = "Step 1 of 2: Removing personal identifiers...";
+  stepDetail.textContent = "Calling de-identification service";
+
+  try {
+    var deidRes = await fetch(DEID_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ANON_KEY, "apikey": ANON_KEY },
+      body: JSON.stringify({ text: rawText, include_report: true, rp_status: window._rpStatus || "unknown" })
+    });
+    var deidData = await deidRes.json();
+    if (!deidData.error && deidData.sanitised_text) {
+      deidResult = deidData;
+      sanitisedText = deidData.sanitised_text;
+      var ds = deidData.detection_summary || {};
+      var total = ds.total_detections || 0;
+      var cats = ds.by_category || {};
+      if (total > 0) {
+        var catStr = Object.entries(cats).map(function(e) { return e[1] + " " + e[0]; }).join(", ");
+        deidBanner.innerHTML = "<strong>" + total + " personal identifiers removed</strong> before analysis (" + catStr + ")";
+        deidBanner.classList.add("show");
+      }
+    }
+  } catch (e) {
+    console.warn("De-identification failed, proceeding with raw text:", e);
+    stepDetail.textContent = "De-identification unavailable — proceeding with raw text";
+    await new Promise(function(r) { setTimeout(r, 1000); });
+  }
+
+  // Step 2: Evaluate
+  stepLabel.textContent = "Step 2 of 2: Evaluating BSP quality...";
+  stepDetail.textContent = "Analysing clinical content with AI evaluator";
+
+  try {
+    var evalRes = await fetch(EVAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ANON_KEY, "apikey": ANON_KEY },
+      body: JSON.stringify({ bsp_text: sanitisedText })
+    });
+    var evalData = await evalRes.json();
+    if (evalData.error) throw new Error(evalData.error);
+    currentResult = evalData;
+  } catch (e) {
+    loading.classList.remove("show");
+    document.getElementById("input-section").classList.remove("hidden");
+    alert("Evaluation failed: " + e.message);
+    return;
+  }
+
+  loading.classList.remove("show");
+  renderResults();
+}
+
+// ── RENDER RESULTS ──
+function renderResults() {
+  document.getElementById("results-section").classList.add("show");
+  var r = currentResult;
+  var score = r.quality_score || r.score || r.final_score || 0;
+  var level = r.quality_level || r.level || r.risk_level || "medium";
+  var rec = r.summary || r.recommendation || "";
+  var holdStatus = r.release_recommendation || r.releaseRecommendation || "";
+  var profile = r.primary_profile || r.profile || "";
+
+  // Score hero
+  var bgClass = "bg-" + level;
+  var bandClass = "band-" + level;
+  hideSpinner();
+  var hero = document.getElementById("scoreHero");
+  hero.innerHTML = '<div class="score-circle ' + bgClass + '"><div class="num">' + Math.round(score) + '</div></div>' +
+    '<div class="score-meta"><h2>BSP Quality Score</h2>' +
+    '<div class="rec">' + (rec || "Score: " + score + "/100") + '</div>' +
+    '<span class="band-badge ' + bandClass + '">' + level.toUpperCase() + ' RISK</span>' +
+    (profile ? '<span class="profile-badge">Profile ' + profile + '</span>' : '') +
+    (holdStatus ? '<span style="display:inline-block;padding:3px 12px;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;background:' + (holdStatus === 'PASS' ? '#dcfce7;color:#166534' : holdStatus === 'HOLD' ? '#fef3c7;color:#92400e' : '#fee2e2;color:#991b1b') + '">' + holdStatus + '</span>' : '') +
+    '</div>';
+
+
+  // Profile badge with explanation
+  var profileDescriptions = {
+    A: "Rights Violation — Immediate review required. Serious governance, dignity, or safety failures.",
+    B: "Safety Concern — Safeguarding risks or consent issues require urgent attention.",
+    C: "Restrictive Practice Dependent. Plan relies on restrictive practices requiring NDIS Commission oversight.",
+    D: "Under-Evidenced — Significant gaps in functional assessment, evidence base, or clinical reasoning.",
+    E: "Safe & Defensible — Meets PBS standards. No restrictive practices or well-documented fade-out plans."
+  };
+  var profileHtml = "";
+  if (profile) {
+    var pClass = "profile-" + profile.toLowerCase();
+    profileHtml = '<div class="profile-section"><span class="profile-badge ' + pClass + '">Profile ' + profile + '</span>';
+    if (profileDescriptions[profile]) {
+      profileHtml += '<div class="profile-explain">' + profileDescriptions[profile] + '</div>';
+    }
+    profileHtml += '</div>';
+  }
+  document.getElementById("scoreHero").innerHTML += profileHtml;
+
+  // Domains
+  var domainLabels = {
+    d1_rp_identification: "RP Identification", d2_functional_assessment: "Functional Assessment", d3_evidence_base: "Evidence Base",
+    d4_person_centred: "Person-Centred", d5_fade_out: "Fade-Out Plans", d6_consent_rights: "Consent & Rights", d7_implementation: "Implementation"
+  };
+  var domains = r.domain_scores || r.domains || {};
+  var domainHtml = "";
+  for (var dk in domainLabels) {
+    var dv = domains[dk];
+    var ds = typeof dv === "object" ? (dv.score || 0) : (dv || 0);
+    var col = ds >= 75 ? "var(--green)" : ds >= 50 ? "var(--amber)" : "var(--red)";
+    domainHtml += '<div class="domain-row"><div class="domain-name">' + domainLabels[dk] + '</div>' +
+      '<div class="domain-bar-wrap"><div class="domain-bar" style="width:' + ds + '%;background:' + col + '"></div></div>' +
+      '<div class="domain-score">' + Math.round(ds) + '</div></div>';
+  }
+  document.getElementById("domainBars").innerHTML = domainHtml;
+
+  // Radar chart
+  if (window.Chart) {
+    var radarLabels = [];
+    var radarData = [];
+    for (var rk in domainLabels) {
+      radarLabels.push(domainLabels[rk]);
+      var rv = domains[rk];
+      radarData.push(typeof rv === "object" ? (rv.score || 0) : (rv || 0));
+    }
+    var existingChart = Chart.getChart("radarChart");
+    if (existingChart) existingChart.destroy();
+    new Chart(document.getElementById("radarChart"), {
+      type: "radar",
+      data: {
+        labels: radarLabels,
+        datasets: [{
+          label: "Domain Score",
+          data: radarData,
+          backgroundColor: "rgba(37, 99, 235, 0.15)",
+          borderColor: "rgba(37, 99, 235, 0.8)",
+          borderWidth: 2,
+          pointBackgroundColor: "rgba(37, 99, 235, 1)",
+          pointRadius: 4
+        }]
+      },
+      options: {
+          responsive:true, maintainAspectRatio:true,
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 100,
+            ticks: { stepSize: 25, font: { size: 10 } },
+            pointLabels: { font: { size: 11, family: "DM Sans" } },
+            grid: { color: "rgba(0,0,0,0.06)" }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+
+
+  // Restrictive Practices
+  var rps = r.restrictive_practices || [];
+  if (rps.length > 0) {
+    document.getElementById("rpCard").style.display = "";
+    var rpHtml = '<table class="rp-table"><thead><tr><th>Type</th><th>Rationale</th><th>Fade-out</th><th>Authorised</th></tr></thead><tbody>';
+    rps.forEach(function(rp) {
+      rpHtml += '<tr><td>' + (rp.type || rp.practice_type || "—") + '</td>' +
+        '<td>' + (rp.has_rationale ? '<span class="rp-yes">Yes</span>' : '<span class="rp-no">No</span>') + '</td>' +
+        '<td>' + (rp.has_fade_out ? '<span class="rp-yes">Yes</span>' : '<span class="rp-no">No</span>') + '</td>' +
+        '<td>' + (rp.is_authorised ? '<span class="rp-yes">Yes</span>' : '<span class="rp-no">No</span>') + '</td></tr>';
+    });
+    rpHtml += '</tbody></table>';
+    document.getElementById("rpContent").innerHTML = rpHtml;
+  }
+
+  // Concerns & Strengths
+  var concerns = r.key_concerns || [];
+  var strengths = r.key_strengths || [];
+  if (concerns.length || strengths.length) {
+    document.getElementById("csCard").style.display = "";
+    var cHtml = "<div class='card-title'>Key Concerns</div><ul class='kv-list'>";
+    concerns.forEach(function(c) { cHtml += "<li class='concern-icon'>" + c + "</li>"; });
+    if (!concerns.length) cHtml += "<li style='color:var(--muted)'>None identified</li>";
+    cHtml += "</ul>";
+    document.getElementById("concernsCol").innerHTML = cHtml;
+
+    var sHtml = "<div class='card-title'>Key Strengths</div><ul class='kv-list'>";
+    strengths.forEach(function(s) { sHtml += "<li class='strength-icon'>" + s + "</li>"; });
+    if (!strengths.length) sHtml += "<li style='color:var(--muted)'>None identified</li>";
+    sHtml += "</ul>";
+    document.getElementById("strengthsCol").innerHTML = sHtml;
+  }
+
+  // Flags
+  var flags = r.flags || [];
+  if (flags.length) {
+    document.getElementById("flagsCard").style.display = "";
+    var fHtml = "";
+    flags.forEach(function(f, idx) {
+      var sev = (typeof f.severity === "string") ? f.severity : (f.severity >= 4) ? "high" : (f.severity >= 3) ? "medium" : (f.severity >= 2) ? "low" : "info";
+      var flagType = (f.type || f.code || "FLAG").replace(/_/g, " ");
+      var detail = f.detail || f.message || "";
+      var section = f.section || "";
+      fHtml += '<div class="flag-item flag-' + sev + '" onclick="toggleFlag(' + idx + ')">';
+      fHtml += '<span class="flag-code">' + flagType + '</span>';
+      fHtml += '<span class="flag-expand">click for details</span>';
+      fHtml += detail;
+      if (section || detail) {
+        fHtml += '<div class="flag-detail" id="flag-detail-' + idx + '">';
+        if (section) fHtml += '<div class="flag-section-label">BSP Section: ' + section + '</div>';
+        fHtml += '<div>Severity: <strong>' + sev.toUpperCase() + '</strong></div>';
+        fHtml += '</div>';
+      }
+      fHtml += '</div>';
+    });
+    document.getElementById("flagsList").innerHTML = fHtml;
+  }
+}
+
+// ── WORD EXPORT ──
+async function exportWord() {
+  if (!currentResult) return;
+  var r = currentResult;
+  var score = r.quality_score || r.score || r.final_score || 0;
+  var level = r.quality_level || r.level || r.risk_level || "medium";
+
+  var D = docx;
+  var children = [];
+
+  // Executive summary
+  var execSummary = r.summary || "BSP quality evaluation completed.";
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: "BSP Quality Report", bold: true, size: 36, font: "Calibri", color: "1A1A2E" })], spacing: { after: 100 } }));
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Caritas AI — NDIS Behaviour Support Plan Evaluator", size: 20, color: "888888", font: "Calibri" })], spacing: { after: 200 } }));
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Executive Summary", bold: true, size: 26, font: "Calibri" })], spacing: { after: 100 } }));
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: execSummary, size: 22, font: "Calibri" })], spacing: { after: 200 } }));
+  if (profile) {
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Profile Classification: " + profile, bold: true, size: 22, font: "Calibri" })], spacing: { after: 100 } }));
+    var pd = {A:"Well-documented, no restrictive practices.",B:"Generally adequate with gaps.",C:"Restrictive Practice Dependent — requires Commission oversight.",D:"Significant clinical concerns.",E:"Critical safety risk — immediate review required."};
+    if (pd[profile]) children.push(new D.Paragraph({ children: [new D.TextRun({ text: pd[profile], size: 20, font: "Calibri", italics: true })], spacing: { after: 200 } }));
+  }
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Generated by Caritas AI — " + new Date().toLocaleDateString("en-AU"), size: 20, color: "888888", font: "Calibri" })], spacing: { after: 400 } }));
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Overall Score: " + Math.round(score) + "/100 (" + level.toUpperCase() + " RISK)", bold: true, size: 28, font: "Calibri" })], spacing: { after: 200 } }));
+
+  if (r.recommendation) {
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: r.recommendation, size: 22, font: "Calibri" })], spacing: { after: 400 } }));
+  }
+
+  // De-id summary
+  if (deidResult && deidResult.detection_summary) {
+    var ds = deidResult.detection_summary;
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: "De-Identification Summary", bold: true, size: 24, font: "Calibri" })], spacing: { before: 200, after: 100 } }));
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: ds.total_detections + " personal identifiers removed before analysis. " + (ds.auto_masked || 0) + " auto-masked, " + (ds.flagged_for_review || 0) + " flagged for review.", size: 20, font: "Calibri" })], spacing: { after: 300 } }));
+  }
+
+  // Flags
+  var flags = r.flags || [];
+  if (flags.length) {
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Flags (" + flags.length + ")", bold: true, size: 24, font: "Calibri" })], spacing: { before: 200, after: 100 } }));
+    flags.forEach(function(f) {
+      children.push(new D.Paragraph({ children: [
+        new D.TextRun({ text: (f.type || f.code || "FLAG").toUpperCase() + ": ", bold: true, size: 20, font: "Calibri" }),
+        new D.TextRun({ text: f.detail || f.message || "", size: 20, font: "Calibri" })
+      ], spacing: { after: 80 } }));
+    });
+  }
+
+  // Concerns
+  var concerns = r.key_concerns || [];
+  if (concerns.length) {
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Key Concerns", bold: true, size: 24, font: "Calibri" })], spacing: { before: 200, after: 100 } }));
+    concerns.forEach(function(c) {
+      children.push(new D.Paragraph({ children: [new D.TextRun({ text: "• " + c, size: 20, font: "Calibri" })], spacing: { after: 60 } }));
+    });
+  }
+
+  // Strengths
+  var strengths = r.key_strengths || [];
+  if (strengths.length) {
+    children.push(new D.Paragraph({ children: [new D.TextRun({ text: "Key Strengths", bold: true, size: 24, font: "Calibri" })], spacing: { before: 200, after: 100 } }));
+    strengths.forEach(function(s) {
+      children.push(new D.Paragraph({ children: [new D.TextRun({ text: "• " + s, size: 20, font: "Calibri" })], spacing: { after: 60 } }));
+    });
+  }
+
+  // Footer
+  children.push(new D.Paragraph({ children: [new D.TextRun({ text: "This report was generated by Caritas AI and is not a substitute for clinical judgement.", size: 16, color: "999999", font: "Calibri", italics: true })], spacing: { before: 400 } }));
+
+  var doc = new D.Document({ sections: [{ children: children }] });
+  var blob = await D.Packer.toBlob(doc);
+  saveAs(blob, "bsp-quality-report-" + new Date().toISOString().slice(0, 10) + ".docx");
+}
+
+
+// Toggle flag detail
+function toggleFlag(idx) {
+  var el = document.getElementById("flag-detail-" + idx);
+  if (el) el.classList.toggle("show");
+}
+
+// ── JSON EXPORT ──
+function exportJSON() {
+  if (!currentResult) return;
+  var data = { evaluation: currentResult, deidentification: deidResult ? deidResult.detection_summary : null, timestamp: new Date().toISOString() };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  saveAs(blob, "bsp-quality-report-" + new Date().toISOString().slice(0, 10) + ".json");
+}
+</script>
+
+<script>
+if (window.location.search.indexOf("embedded=true") !== -1) {
+  document.addEventListener("DOMContentLoaded", function() {
+    var hdr = document.querySelector(".header");
+    if (hdr) hdr.style.display = "none";
+    var ctr = document.querySelector(".container");
+    if (ctr) ctr.style.paddingTop = "12px";
+  });
+}
+
+
+// ═══ TWO-PASS RP REFINEMENT ═══
+window._rpStatus = "unknown";
+window._slowTimer = null;
+
+// Show spinner
+function showSpinner() {
+  var sp = document.getElementById("evalSpinner");
+  if (sp) sp.classList.add("on");
+  var sl = document.getElementById("evalSlow");
+  if (sl) sl.style.display = "none";
+  window._slowTimer = setTimeout(function() { if (sl) sl.style.display = "block"; }, 12000);
+}
+
+// Hide spinner
+function hideSpinner() {
+  var sp = document.getElementById("evalSpinner");
+  if (sp) sp.classList.remove("on");
+  clearTimeout(window._slowTimer);
+}
+
+// Show RP refinement panel if RPs detected
+function checkForRPs(result) {
+  var panel = document.getElementById("rpPanel");
+  if (!panel) return;
+
+  var rps = result.restrictive_practices || [];
+  var flags = (result.flags || []).filter(function(f) {
+    return f.type && (f.type.indexOf("restrictive") >= 0 || f.type.indexOf("rp_") >= 0);
+  });
+
+  if (rps.length === 0 && flags.length === 0) {
+    panel.classList.remove("show");
+    return;
+  }
+
+  // Show detected RPs
+  var html = "";
+  rps.forEach(function(rp) {
+    html += '<span class="rp-tag">' + (rp.type || "RP").replace(/_/g, " ") + '</span>';
+  });
+  if (rps.length === 0) {
+    flags.forEach(function(f) {
+      html += '<span class="rp-tag">' + (f.type || "").replace(/_/g, " ") + '</span>';
+    });
+  }
+  document.getElementById("rpDetected").innerHTML = html;
+
+  // Only show if first pass (unknown status)
+  if (window._rpStatus === "unknown") {
+    panel.classList.add("show");
+  } else {
+    panel.classList.remove("show");
+  }
+}
+
+// Re-evaluate with selected RP status
+function reEvalWithRP() {
+  var sel = document.querySelector('input[name="rpRefine"]:checked');
+  if (!sel) { alert("Select an authorisation status first."); return; }
+  window._rpStatus = sel.value;
+  runCheck();
+}
+
+// Auto-evaluate after file upload
+var _origRunCheck = typeof runCheck === "function" ? runCheck : null;
+
+</script>
+</body>
+</html>
